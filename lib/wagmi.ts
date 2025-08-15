@@ -8,7 +8,6 @@ import {
 } from '@rainbow-me/rainbowkit/wallets';
 import { useMemo } from 'react';
 import { http, createConfig } from 'wagmi';
-import * as wagmiChains from 'wagmi/chains';
 import { RPC_URL, WC_PROJECT_ID } from '../config/constants';
 import { mantleSepoliaTestnet } from 'wagmi/chains';
 
