@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import Link from "next/link"
 import { FileText, Calendar, MessageSquare, Mail, ChevronRight, ArrowUp, Clock, Users, Moon, Upload, X, Bot, Loader2 } from "lucide-react"
+import { ConnectWallet } from "@/components/connect-wallet"
+import { TransactionHandler } from "@/components/transaction-handler"
 
 export function FundraisingDashboard() {
   const [chatMessage, setChatMessage] = useState("")
@@ -194,9 +196,7 @@ export function FundraisingDashboard() {
             <h1 className="text-xl font-bold text-white">FundraiseAgent</h1>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 bg-transparent">
-              Get Early Access
-            </Button>
+            <ConnectWallet />
             <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
               <Moon className="w-4 h-4" />
             </Button>
@@ -240,7 +240,7 @@ export function FundraisingDashboard() {
             </div>
 
             {/* Main Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Files Section */}
               <Card className="bg-white/10 backdrop-blur-sm border-white/20 shadow-lg">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
@@ -495,6 +495,9 @@ export function FundraisingDashboard() {
                   ))}
                 </CardContent>
               </Card>
+
+              {/* Smart Contract Section */}
+              <TransactionHandler />
             </div>
           </div>
         </div>
