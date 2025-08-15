@@ -37,7 +37,7 @@ This document describes the wagmi integration that has been added to the Fundrai
 ```tsx
 // Features:
 - Mint subscription NFT
-- Extend subscription (1 MNT)
+- Extend subscription (10 MNT)
 - Read subscription status
 - Transaction confirmation states
 - Error handling
@@ -91,8 +91,8 @@ If the contract ABI changes, update the `SUBSCRIPTION_NFT_ABI` in `components/tr
 
 ### Extending Subscription
 1. Enter your token ID in the input field
-2. Click "Extend Subscription (1 MNT)"
-3. Approve the transaction with 1 MNT payment
+2. Click "Extend Subscription (10 MNT)"
+3. Approve the transaction with 10 MNT payment
 4. Wait for confirmation
 
 ## Wagmi Hooks Used

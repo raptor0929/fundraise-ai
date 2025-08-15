@@ -1,13 +1,13 @@
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // SubscriptionNFT contract ABI
 const SUBSCRIPTION_NFT_ABI = [
   {
-    "inputs": [],
+    "inputs": [{"type": "address"}],
     "name": "mint",
     "outputs": [{"type": "uint256"}],
-    "stateMutability": "nonpayable",
+    "stateMutability": "payable",
     "type": "function"
   },
   {
@@ -34,15 +34,51 @@ const SUBSCRIPTION_NFT_ABI = [
     ],
     "stateMutability": "view",
     "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalSupply",
+    "outputs": [{"type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "subscriptionCost",
+    "outputs": [{"type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "subscriptionDuration",
+    "outputs": [{"type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"type": "uint256"}],
+    "name": "updateSubscriptionCost",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"type": "uint256"}],
+    "name": "updateSubscriptionDuration",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   }
 ] as const
 
 // Replace with your deployed contract address
-const CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000' // Update this
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS! as `0x${string}` // Update this
 
 export function useContract() {
   const { address, isConnected } = useAccount()
   const [tokenId, setTokenId] = useState<number | null>(null)
+  const [mintedTokenId, setMintedTokenId] = useState<number | null>(null)
 
   // Mint NFT
   const { 
@@ -61,7 +97,7 @@ export function useContract() {
   } = useWriteContract()
 
   // Wait for mint transaction
-  const { isLoading: isMintConfirming, isSuccess: isMintSuccess } = useWaitForTransactionReceipt({
+  const { isLoading: isMintConfirming, isSuccess: isMintSuccess, data: mintReceipt } = useWaitForTransactionReceipt({
     hash: mintHash,
   })
 
@@ -70,14 +106,44 @@ export function useContract() {
     hash: extendHash,
   })
 
-  // Read subscription status
+  // Get total supply to determine the minted token ID
+  const { data: totalSupply } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: SUBSCRIPTION_NFT_ABI,
+    functionName: 'totalSupply',
+    query: {
+      enabled: isConnected,
+    },
+  })
+
+  // Read current subscription cost
+  const { data: currentSubscriptionCost } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: SUBSCRIPTION_NFT_ABI,
+    functionName: 'subscriptionCost',
+    query: {
+      enabled: isConnected,
+    },
+  })
+
+  // Read current subscription duration
+  const { data: currentSubscriptionDuration } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: SUBSCRIPTION_NFT_ABI,
+    functionName: 'subscriptionDuration',
+    query: {
+      enabled: isConnected,
+    },
+  })
+
+  // Read subscription status for the minted token
   const { data: isActive, refetch: refetchStatus } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: SUBSCRIPTION_NFT_ABI,
     functionName: 'isSubscriptionActive',
-    args: tokenId ? [BigInt(tokenId)] : undefined,
+    args: mintedTokenId ? [BigInt(mintedTokenId)] : undefined,
     query: {
-      enabled: !!tokenId,
+      enabled: !!mintedTokenId,
     },
   })
 
@@ -86,32 +152,47 @@ export function useContract() {
     address: CONTRACT_ADDRESS,
     abi: SUBSCRIPTION_NFT_ABI,
     functionName: 'getSubscriptionData',
-    args: tokenId ? [BigInt(tokenId)] : undefined,
+    args: mintedTokenId ? [BigInt(mintedTokenId)] : undefined,
     query: {
-      enabled: !!tokenId,
+      enabled: !!mintedTokenId,
     },
   })
 
+  // Update minted token ID when total supply changes (indicating a new mint)
+  useEffect(() => {
+    if (totalSupply !== undefined && totalSupply > 0) {
+      setMintedTokenId(Number(totalSupply))
+    }
+  }, [totalSupply])
+
+  // Refetch status when mint is successful
+  useEffect(() => {
+    if (isMintSuccess && mintedTokenId) {
+      refetchStatus()
+    }
+  }, [isMintSuccess, mintedTokenId, refetchStatus])
+
   const handleMint = () => {
-    if (!isConnected) return
+    if (!isConnected || !address || !currentSubscriptionCost) return
     
     mintNFT({
       address: CONTRACT_ADDRESS,
       abi: SUBSCRIPTION_NFT_ABI,
       functionName: 'mint',
-      args: [],
+      args: [address],
+      value: currentSubscriptionCost,
     })
   }
 
   const handleExtend = () => {
-    if (!isConnected || !tokenId) return
+    if (!isConnected || !tokenId || !currentSubscriptionCost) return
     
     extendSubscription({
       address: CONTRACT_ADDRESS,
       abi: SUBSCRIPTION_NFT_ABI,
       functionName: 'extendSubscription',
       args: [BigInt(tokenId)],
-      value: BigInt('1000000000000000000'), // 1 MNT
+      value: currentSubscriptionCost,
     })
   }
 
@@ -121,6 +202,7 @@ export function useContract() {
     isConnected,
     tokenId,
     setTokenId,
+    mintedTokenId,
     
     // Mint functions
     handleMint,
@@ -142,6 +224,9 @@ export function useContract() {
     isActive,
     subscriptionData,
     refetchStatus,
+    totalSupply,
+    currentSubscriptionCost,
+    currentSubscriptionDuration,
     
     // Contract info
     contractAddress: CONTRACT_ADDRESS,

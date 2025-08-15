@@ -88,7 +88,7 @@ export function TransactionHandler() {
 
         {/* Extend Subscription */}
         <div className="space-y-2">
-          <h3 className="text-white font-medium">Extend Subscription (1 MNT)</h3>
+          <h3 className="text-white font-medium">Extend Subscription (10 MNT)</h3>
           <Button 
             onClick={handleExtend}
             disabled={isExtending || isExtendConfirming || !tokenId}

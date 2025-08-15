@@ -160,7 +160,7 @@ The contract is optimized for gas efficiency:
 
 ### Error Messages
 
-- `"Incorrect payment amount"`: Send exactly 1 MNT for subscription
+- `"Incorrect payment amount"`: Send exactly 10 MNT for subscription
 - `"Not the token owner"`: Only NFT owner can extend subscription
 - `"Token does not exist"`: Token ID is invalid
 - `"Subscription not active"`: NFT subscription has expired

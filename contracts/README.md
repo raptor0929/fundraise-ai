@@ -6,7 +6,7 @@ A subscription-based NFT contract for the Mantle network that allows users to mi
 
 - **Anyone can mint**: No restrictions on who can mint an NFT
 - **Subscription-based activation**: NFTs require active subscriptions to be transferable
-- **MNT payments**: 1 MNT per 30-day subscription period
+- **MNT payments**: 10 MNT per 30-day subscription period
 - **Flexible renewal**: Expired NFTs can be reactivated with new payments
 - **State management**: Clear active/inactive states based on expiration
 - **Owner controls**: Contract owner can withdraw collected fees and manage subscriptions
@@ -16,7 +16,7 @@ A subscription-based NFT contract for the Mantle network that allows users to mi
 ### Core Functions
 
 - `mint(address recipient)` - Mint a new NFT (anyone can call)
-- `extendSubscription(uint256 tokenId)` - Extend subscription by 30 days (requires 1 MNT)
+- `extendSubscription(uint256 tokenId)` - Extend subscription by 30 days (requires 10 MNT)
 - `isSubscriptionActive(uint256 tokenId)` - Check if subscription is active
 - `getSubscriptionData(uint256 tokenId)` - Get detailed subscription information
 - `getTimeRemaining(uint256 tokenId)` - Get time remaining until expiration
@@ -24,7 +24,7 @@ A subscription-based NFT contract for the Mantle network that allows users to mi
 
 ### Key Constants
 
-- `SUBSCRIPTION_COST`: 1 MNT (1 ether)
+- `SUBSCRIPTION_COST`: 10 MNT (1 ether)
 - `SUBSCRIPTION_DURATION`: 30 days
 
 ## Installation & Setup
@@ -113,8 +113,8 @@ uint256 tokenId = subscriptionNFT.mint(userAddress);
 ### Extending Subscription
 
 ```solidity
-// Extend subscription by 30 days (requires 1 MNT)
-subscriptionNFT.extendSubscription{value: 1 ether}(tokenId);
+// Extend subscription by 30 days (requires 10 MNT)
+subscriptionNFT.extendSubscription{value: 10 ether}(tokenId);
 ```
 
 ### Checking Subscription Status

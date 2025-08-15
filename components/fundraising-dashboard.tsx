@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import { useState, useEffect, useRef } from "react"
@@ -6,19 +7,18 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import Link from "next/link"
-import { FileText, Calendar, MessageSquare, Mail, ChevronRight, ArrowUp, Clock, Users, Moon, Upload, X, Bot, Loader2 } from "lucide-react"
+import { FileText, Calendar, MessageSquare, Mail, ChevronRight, ArrowUp, Clock, Users, Moon, Upload, X, Bot, Loader2, CheckCircle } from "lucide-react"
 import { ConnectWallet } from "@/components/connect-wallet"
-import { TransactionHandler } from "@/components/transaction-handler"
+import { useContract } from "@/hooks/use-contract"
 
 export function FundraisingDashboard() {
   const [chatMessage, setChatMessage] = useState("")
+  const [isSubscribed, setIsSubscribed] = useState(false)
+  const [showCrmDatabase, setShowCrmDatabase] = useState(false)
 
-  const [uploadedFiles, setUploadedFiles] = useState([
-    { id: "1", name: "Pitch Deck - Series A", type: "pdf", icon: FileText, color: "bg-blue-600", size: 0 },
-    { id: "2", name: "Target Funds List", type: "csv", icon: FileText, color: "bg-purple-600", size: 0 },
-  ])
+  const [uploadedFiles, setUploadedFiles] = useState<any[]>([])
 
-  const [aiGeneratedFiles, setAiGeneratedFiles] = useState([
+  const [aiGeneratedFiles] = useState([
     { id: "3", name: "CRM Database", type: "sheet", icon: FileText, color: "bg-indigo-600", size: 0 },
   ])
 
@@ -31,6 +31,32 @@ export function FundraisingDashboard() {
   const [processingFiles, setProcessingFiles] = useState<Set<string>>(new Set())
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Contract integration
+  const {
+    isConnected,
+    handleMint,
+    isMinting,
+    isMintConfirming,
+    isMintSuccess,
+    mintError,
+    isActive,
+    currentSubscriptionCost,
+  } = useContract()
+
+  // Format subscription cost for display
+  const formatSubscriptionCost = (cost: bigint | undefined) => {
+    if (!cost) return "10 MNT"
+    const costInMNT = Number(cost) / 1e18
+    return `${costInMNT} MNT`
+  }
+
+  // Check subscription status when component mounts or contract state changes
+  useEffect(() => {
+    if (isMintSuccess || isActive) {
+      setIsSubscribed(true)
+    }
+  }, [isMintSuccess, isActive])
+
   // Monitor uploadedFiles state changes
   useEffect(() => {
     console.log('uploadedFiles state changed, count:', uploadedFiles.length)
@@ -40,6 +66,8 @@ export function FundraisingDashboard() {
   }, [uploadedFiles])
 
   const handleFileUpload = async (file: File) => {
+    if (!isSubscribed) return // Disable file upload if not subscribed
+    
     console.log('handleFileUpload called with:', file.name)
     
     const now = Date.now()
@@ -109,6 +137,8 @@ export function FundraisingDashboard() {
   }
 
   const handleStartFundraise = (fileId: string) => {
+    if (!isSubscribed) return // Disable fundraise if not subscribed
+    
     console.log('Starting fundraise for file:', fileId)
     setProcessingFiles(prev => new Set(prev).add(fileId))
     
@@ -119,16 +149,19 @@ export function FundraisingDashboard() {
         newSet.delete(fileId)
         return newSet
       })
+      // Show CRM Database after fundraise processing is complete
+      setShowCrmDatabase(true)
       console.log('Fundraise completed for file:', fileId)
     }, 5000)
   }
 
   const handleActionButtonClick = (actionText: string) => {
+    if (!isSubscribed) return // Disable action buttons if not subscribed
     setChatMessage(actionText)
   }
 
   const handleChatSubmit = () => {
-    if (!chatMessage.trim()) return
+    if (!chatMessage.trim() || !isSubscribed) return // Disable chat if not subscribed
     
     console.log('Submitting chat message:', chatMessage)
     setIsSubmitting(true)
@@ -139,6 +172,15 @@ export function FundraisingDashboard() {
       setChatMessage('')
       console.log('Chat submission completed')
     }, 5000)
+  }
+
+  const handleSubscribe = () => {
+    if (!isConnected) return
+    handleMint()
+  }
+
+  const handleCrmDatabaseClick = () => {
+    window.open('https://docs.google.com/spreadsheets/d/1s1wiWbeTLt06rwWvSWjcUHxQLa5VoW61i81T3YDN19A/edit?gid=1390972581#gid=1390972581', '_blank')
   }
 
   const meetings = [
@@ -213,27 +255,63 @@ export function FundraisingDashboard() {
                 Your AI co-pilot for pitch deck analysis, VC outreach, and fundraising strategy. Get institutional-grade
                 insights in seconds.
               </p>
+              
+              {/* Subscribe Button */}
+              {isConnected && !isSubscribed && (
+                <div className="mt-8">
+                  <Button 
+                    onClick={handleSubscribe}
+                    disabled={isMinting || isMintConfirming}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg font-semibold"
+                  >
+                    {isMinting || isMintConfirming ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {isMinting ? 'Minting...' : 'Confirming...'}
+                      </>
+                    ) : (
+                      'Subscribe (' + formatSubscriptionCost(currentSubscriptionCost) + ')'
+                    )}
+                  </Button>
+                  {mintError && (
+                    <div className="mt-4 text-red-400 text-sm">
+                      Error: {mintError.message}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Subscription Success Message */}
+              {isSubscribed && (
+                <div className="mt-8 flex items-center justify-center gap-2 text-green-400">
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="text-lg font-semibold">Subscription Active!</span>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap justify-center gap-4 mb-12">
               <Button 
                 variant="outline" 
-                className="border-white/20 text-white hover:bg-white/10 bg-transparent"
+                className={`border-white/20 text-white hover:bg-white/10 bg-transparent ${!isSubscribed ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => handleActionButtonClick("Analyze my pitch deck for Series A readiness")}
+                disabled={!isSubscribed}
               >
                 Analyze my pitch deck for Series A readiness
               </Button>
               <Button 
                 variant="outline" 
-                className="border-white/20 text-white hover:bg-white/10 bg-transparent"
+                className={`border-white/20 text-white hover:bg-white/10 bg-transparent ${!isSubscribed ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => handleActionButtonClick("Find VCs that invest in my industry and stage")}
+                disabled={!isSubscribed}
               >
                 Find VCs that invest in my industry and stage
               </Button>
               <Button 
                 variant="outline" 
-                className="border-white/20 text-white hover:bg-white/10 bg-transparent"
+                className={`border-white/20 text-white hover:bg-white/10 bg-transparent ${!isSubscribed ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => handleActionButtonClick("Draft a follow-up email to potential investors")}
+                disabled={!isSubscribed}
               >
                 Draft a follow-up email to potential investors
               </Button>
@@ -242,7 +320,7 @@ export function FundraisingDashboard() {
             {/* Main Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Files Section */}
-              <Card className="bg-white/10 backdrop-blur-sm border-white/20 shadow-lg">
+              <Card className={`bg-white/10 backdrop-blur-sm border-white/20 shadow-lg ${!isSubscribed ? 'opacity-50' : ''}`}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                   <CardTitle className="text-lg font-semibold flex items-center gap-2 text-white">
                     <FileText className="w-5 h-5" />
@@ -262,14 +340,18 @@ export function FundraisingDashboard() {
                           handleFileUpload(file)
                         }
                       }}
+                      disabled={!isSubscribed}
                     />
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="text-gray-300 hover:bg-white/10 cursor-pointer"
+                      className={`text-gray-300 hover:bg-white/10 cursor-pointer ${!isSubscribed ? 'cursor-not-allowed' : ''}`}
                       onClick={() => {
-                        document.getElementById('file-upload')?.click()
+                        if (isSubscribed) {
+                          document.getElementById('file-upload')?.click()
+                        }
                       }}
+                      disabled={!isSubscribed}
                     >
                       <Upload className="w-4 h-4 mr-1" />
                       Upload file
@@ -326,13 +408,13 @@ export function FundraisingDashboard() {
                             {isPdf && (
                               <Button
                                 size="sm"
-                                disabled={isProcessing}
+                                disabled={isProcessing || !isSubscribed}
                                 onClick={() => handleStartFundraise(file.id)}
                                 className={`${
                                   isProcessing 
                                     ? 'bg-blue-600 text-white' 
                                     : 'bg-green-600 hover:bg-green-700 text-white'
-                                }`}
+                                } ${!isSubscribed ? 'opacity-50 cursor-not-allowed' : ''}`}
                               >
                                 {isProcessing ? (
                                   <>
@@ -357,20 +439,28 @@ export function FundraisingDashboard() {
                   <div>
                     <h3 className="text-sm font-medium text-gray-300 mb-3">Generated by Fundraise AI</h3>
                     <div className="space-y-2">
-                      {aiGeneratedFiles.map((file) => (
-                        <div
-                          key={file.id}
-                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 cursor-pointer transition-colors"
-                        >
-                          <div className={`p-2 rounded-lg ${file.color}`}>
-                            <file.icon className="w-5 h-5 text-white" />
+                      {aiGeneratedFiles.map((file) => {
+                        // Only show CRM Database if showCrmDatabase is true
+                        if (file.name === "CRM Database" && !showCrmDatabase) {
+                          return null
+                        }
+                        
+                        return (
+                          <div
+                            key={file.id}
+                            className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 cursor-pointer transition-colors"
+                            onClick={file.name === "CRM Database" ? handleCrmDatabaseClick : undefined}
+                          >
+                            <div className={`p-2 rounded-lg ${file.color}`}>
+                              <file.icon className="w-5 h-5 text-white" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-white">{file.name}</p>
+                              <p className="text-sm text-gray-400">{file.type.toUpperCase()}</p>
+                            </div>
                           </div>
-                          <div className="flex-1">
-                            <p className="font-medium text-white">{file.name}</p>
-                            <p className="text-sm text-gray-400">{file.type.toUpperCase()}</p>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                 </CardContent>
@@ -495,9 +585,6 @@ export function FundraisingDashboard() {
                   ))}
                 </CardContent>
               </Card>
-
-              {/* Smart Contract Section */}
-              <TransactionHandler />
             </div>
           </div>
         </div>
@@ -507,19 +594,20 @@ export function FundraisingDashboard() {
             <div className="flex items-center gap-3">
               <div className="flex-1 relative">
                 <Input
-                  placeholder="Ask anything..."
+                  placeholder={isSubscribed ? "Ask anything..." : "Subscribe to start using FundraiseAgent..."}
                   value={chatMessage}
                   onChange={(e) => setChatMessage(e.target.value)}
                   onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !isSubmitting) {
+                    if (e.key === 'Enter' && !isSubmitting && isSubscribed) {
                       handleChatSubmit()
                     }
                   }}
                   className="pr-12 bg-white/10 border-white/20 focus:border-blue-400 text-white placeholder:text-gray-400 h-12 text-base"
+                  disabled={!isSubscribed}
                 />
                 <Button
                   size="icon"
-                  disabled={isSubmitting || !chatMessage.trim()}
+                  disabled={isSubmitting || !chatMessage.trim() || !isSubscribed}
                   onClick={handleChatSubmit}
                   className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 >
