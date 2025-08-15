@@ -144,9 +144,8 @@ export function FundraisingDashboard() {
       title: "Pitch to Sequoia Capital",
       time: "01:00 - 02:00 PM",
       attendees: [
-        { name: "John", avatar: "/placeholder.svg?height=32&width=32" },
-        { name: "Sarah", avatar: "/placeholder.svg?height=32&width=32" },
-        { name: "Mike", avatar: "/placeholder.svg?height=32&width=32" },
+        { name: "John", avatar: "/john.jpg?height=32&width=32" },
+        { name: "Sarah", avatar: "/sarah.jpg?height=32&width=32" }
       ],
       additionalCount: 2,
     },
