@@ -11,7 +11,7 @@ contract SubscriptionNFTTest is Test {
     address public user1 = address(0x1);
     address public user2 = address(0x2);
     
-    uint256 public constant SUBSCRIPTION_COST = 1 ether;
+    uint256 public constant SUBSCRIPTION_COST = 10 ether;
     uint256 public constant SUBSCRIPTION_DURATION = 30 days;
     
     event NFTMinted(address indexed owner, uint256 indexed tokenId);
@@ -276,9 +276,9 @@ contract SubscriptionNFTTest is Test {
         vm.stopPrank();
     }
     
-    function testConstants() public {
-        assertEq(subscriptionNFT.SUBSCRIPTION_COST(), 1 ether);
-        assertEq(subscriptionNFT.SUBSCRIPTION_DURATION(), 30 days);
+    function testConstants() public view {
+        assertEq(subscriptionNFT.subscriptionCost(), 10 ether);
+        assertEq(subscriptionNFT.subscriptionDuration(), 30 days);
     }
     
     function testEvents() public {

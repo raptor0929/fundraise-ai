@@ -11,7 +11,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  * - Anyone can mint their NFT
  * - Deposit MNT tokens to extend subscription by 30 days
  * - Active/Inactive states based on expiration
- * - 1 MNT per subscription payment
+ * - 10 MNT per subscription payment
  */
 contract SubscriptionNFT is ERC721, Ownable {
     // Events
@@ -19,11 +19,13 @@ contract SubscriptionNFT is ERC721, Ownable {
     event SubscriptionExtended(address indexed owner, uint256 indexed tokenId, uint256 newExpiration);
     event SubscriptionExpired(address indexed owner, uint256 indexed tokenId);
     event Withdrawal(address indexed owner, uint256 amount);
+    event SubscriptionCostUpdated(uint256 oldCost, uint256 newCost);
+    event SubscriptionDurationUpdated(uint256 oldDuration, uint256 newDuration);
     
     // State variables
     uint256 private _tokenIds;
-    uint256 public constant SUBSCRIPTION_COST = 1 ether; // 1 MNT
-    uint256 public constant SUBSCRIPTION_DURATION = 30 days;
+    uint256 public subscriptionCost = 10 ether; // 10 MNT - updatable
+    uint256 public subscriptionDuration = 30 days; // updatable
     
     // Mapping from tokenId to subscription data
     mapping(uint256 => SubscriptionData) public subscriptions;
@@ -41,25 +43,29 @@ contract SubscriptionNFT is ERC721, Ownable {
     constructor() ERC721("Subscription NFT", "SUBNFT") Ownable(msg.sender) {}
     
     /**
-     * @dev Mint a new NFT - anyone can mint
+     * @dev Mint a new NFT with immediate subscription activation - anyone can mint
      * @param recipient The address to receive the NFT
      */
-    function mint(address recipient) external returns (uint256) {
+    function mint(address recipient) external payable returns (uint256) {
         require(recipient != address(0), "Invalid recipient address");
+        require(msg.value == subscriptionCost, "Incorrect payment amount");
         
         _tokenIds++;
         uint256 newTokenId = _tokenIds;
         
         _mint(recipient, newTokenId);
         
-        // Initialize subscription data
+        // Initialize subscription data with immediate activation
         subscriptions[newTokenId] = SubscriptionData({
-            expirationTime: 0,
-            isActive: false,
-            totalPaid: 0
+            expirationTime: block.timestamp + subscriptionDuration,
+            isActive: true,
+            totalPaid: msg.value
         });
         
+        totalCollectedFees += msg.value;
+        
         emit NFTMinted(recipient, newTokenId);
+        emit SubscriptionExtended(recipient, newTokenId, block.timestamp + subscriptionDuration);
         return newTokenId;
     }
     
@@ -69,7 +75,7 @@ contract SubscriptionNFT is ERC721, Ownable {
      */
     function extendSubscription(uint256 tokenId) external payable {
         require(tokenId > 0 && tokenId <= _tokenIds, "Token does not exist");
-        require(msg.value == SUBSCRIPTION_COST, "Incorrect payment amount");
+        require(msg.value == subscriptionCost, "Incorrect payment amount");
         require(ownerOf(tokenId) == msg.sender, "Not the token owner");
         
         SubscriptionData storage subscription = subscriptions[tokenId];
@@ -78,10 +84,10 @@ contract SubscriptionNFT is ERC721, Ownable {
         uint256 newExpiration;
         if (subscription.expirationTime == 0 || block.timestamp > subscription.expirationTime) {
             // First time subscription or expired - start from now
-            newExpiration = block.timestamp + SUBSCRIPTION_DURATION;
+            newExpiration = block.timestamp + subscriptionDuration;
         } else {
             // Extend existing subscription
-            newExpiration = subscription.expirationTime + SUBSCRIPTION_DURATION;
+            newExpiration = subscription.expirationTime + subscriptionDuration;
         }
         
         // Update subscription data
@@ -153,6 +159,29 @@ contract SubscriptionNFT is ERC721, Ownable {
         }
         
         return subscription.expirationTime - block.timestamp;
+    }
+    
+    /**
+     * @dev Update subscription cost (owner only)
+     * @param newCost New subscription cost in wei
+     */
+    function updateSubscriptionCost(uint256 newCost) external onlyOwner {
+        require(newCost > 0, "Cost must be greater than 0");
+        uint256 oldCost = subscriptionCost;
+        subscriptionCost = newCost;
+        emit SubscriptionCostUpdated(oldCost, newCost);
+    }
+    
+    /**
+     * @dev Update subscription duration (owner only)
+     * @param newDuration New subscription duration in seconds
+     */
+    function updateSubscriptionDuration(uint256 newDuration) external onlyOwner {
+        require(newDuration > 0, "Duration must be greater than 0");
+        require(newDuration <= 365 days, "Duration cannot exceed 1 year");
+        uint256 oldDuration = subscriptionDuration;
+        subscriptionDuration = newDuration;
+        emit SubscriptionDurationUpdated(oldDuration, newDuration);
     }
     
     /**
