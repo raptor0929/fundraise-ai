@@ -311,6 +311,7 @@ export function FundraisingDashboard() {
                     <div className="space-y-2">
                       {uploadedFiles.map((file) => {
                         const isProcessing = processingFiles.has(file.id)
+                        const isPdf = file.type.toLowerCase() === 'pdf'
                         return (
                           <div
                             key={file.id}
@@ -323,28 +324,30 @@ export function FundraisingDashboard() {
                               <p className="font-medium text-white">{file.name}</p>
                               <p className="text-sm text-gray-400">{file.type.toUpperCase()}</p>
                             </div>
-                            <Button
-                              size="sm"
-                              disabled={isProcessing}
-                              onClick={() => handleStartFundraise(file.id)}
-                              className={`${
-                                isProcessing 
-                                  ? 'bg-blue-600 text-white' 
-                                  : 'bg-green-600 hover:bg-green-700 text-white'
-                              }`}
-                            >
-                              {isProcessing ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                                  Processing...
-                                </>
-                              ) : (
-                                <>
-                                  <Bot className="w-4 h-4 mr-1" />
-                                  Start Fundraise
-                                </>
-                              )}
-                            </Button>
+                            {isPdf && (
+                              <Button
+                                size="sm"
+                                disabled={isProcessing}
+                                onClick={() => handleStartFundraise(file.id)}
+                                className={`${
+                                  isProcessing 
+                                    ? 'bg-blue-600 text-white' 
+                                    : 'bg-green-600 hover:bg-green-700 text-white'
+                                }`}
+                              >
+                                {isProcessing ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                    Processing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Bot className="w-4 h-4 mr-1" />
+                                    Start Fundraise
+                                  </>
+                                )}
+                              </Button>
+                            )}
                           </div>
                         )
                       })}
