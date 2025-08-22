@@ -20,6 +20,7 @@ Our solution leverages AI to democratize access to institutional-grade fundraisi
 - **VC Matching**: Intelligent identification of investors aligned with your industry and stage
 - **Email Automation**: AI-generated follow-up emails and outreach campaigns
 - **Market Intelligence**: Real-time analysis of fundraising trends and investor preferences
+- **Outreach Agent Co-pilot**: Integrated Relevance AI assistant providing personalized fundraising advice and guidance for new founders
 
 ### 📊 CRM & Database Management
 - **Investor Database**: Comprehensive database of VCs, angels, and institutional investors
@@ -47,6 +48,8 @@ Our solution leverages AI to democratize access to institutional-grade fundraisi
 - **Tailwind CSS**: Utility-first CSS framework for rapid UI development
 - **Radix UI**: Accessible component primitives
 - **RainbowKit**: Professional wallet connection interface
+- **Supabase**: Backend-as-a-Service for database and file storage
+- **Relevance AI**: Integrated chat widget for fundraising guidance
 
 ### Blockchain Integration
 - **Wagmi**: React hooks for Ethereum interactions
@@ -94,6 +97,8 @@ Our solution leverages AI to democratize access to institutional-grade fundraisi
 - npm or yarn
 - MetaMask or compatible wallet
 - Mantle Sepolia testnet configured
+- Supabase project with storage buckets configured
+- Backend service for file processing webhooks
 
 ### Installation
 
@@ -117,6 +122,9 @@ Our solution leverages AI to democratize access to institutional-grade fundraisi
    ```env
    NEXT_PUBLIC_CONTRACT_ADDRESS=0x9D73D78EFdfDa6b101f2caA0aE220e3C698D0309
    NEXT_PUBLIC_WC_PROJECT_ID=your_walletconnect_project_id
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   NEXT_PUBLIC_BACKEND_HOST=your_backend_host_url
    ```
 
 4. **Start the development server**
@@ -172,6 +180,8 @@ Our solution leverages AI to democratize access to institutional-grade fundraisi
 - ✅ Subscription NFT system
 - ✅ CRM database integration
 - ✅ Professional dashboard
+- ✅ Supabase integration for file storage and database
+- ✅ Outreach Agent Co-pilot with Relevance AI
 
 ### Phase 2: Advanced Features
 - 🔄 AI-powered investor matching
