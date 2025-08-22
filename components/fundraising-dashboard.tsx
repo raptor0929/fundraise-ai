@@ -19,9 +19,10 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 export function FundraisingDashboard() {
-  const [chatMessage, setChatMessage] = useState("")
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [showCrmDatabase, setShowCrmDatabase] = useState(false)
+  const [crmSpreadsheetUrl, setCrmSpreadsheetUrl] = useState<string>('')
+  const [isStartingFundraise, setIsStartingFundraise] = useState(false)
 
   const [uploadedFiles, setUploadedFiles] = useState<any[]>([])
   const [fundraiseProjectData, setFundraiseProjectData] = useState<any>(null)
@@ -37,7 +38,6 @@ export function FundraisingDashboard() {
   const isUploadingRef = useRef(false)
   const lastUploadTimeRef = useRef(0)
   const [processingFiles, setProcessingFiles] = useState<Set<string>>(new Set())
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Contract integration
   const {
@@ -309,7 +309,7 @@ export function FundraisingDashboard() {
       }
       
       // Make webhook call to process files
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_HOST}/webhook-test/process-files`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_HOST}/webhook/process-files`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -327,9 +327,15 @@ export function FundraisingDashboard() {
       const result = await response.json()
       console.log('Fundraise processing result:', result)
       
-      // Show CRM Database after successful fundraise processing
-      setShowCrmDatabase(true)
-      console.log('Fundraise completed successfully')
+      // Show CRM Database with the spreadsheet URL from the response
+      if (result.ok && result.spreadsheetUrl) {
+        setShowCrmDatabase(true)
+        // Store the spreadsheet URL for the CRM database link
+        setCrmSpreadsheetUrl(result.spreadsheetUrl)
+        console.log('Fundraise completed successfully, CRM data available')
+      } else {
+        console.error('Invalid response from fundraise processing')
+      }
       
     } catch (error) {
       console.error('Error during fundraise processing:', error)
@@ -346,21 +352,7 @@ export function FundraisingDashboard() {
 
   const handleActionButtonClick = (actionText: string) => {
     if (!isSubscribed) return // Disable action buttons if not subscribed
-    setChatMessage(actionText)
-  }
-
-  const handleChatSubmit = () => {
-    if (!chatMessage.trim() || !isSubscribed) return // Disable chat if not subscribed
-    
-    console.log('Submitting chat message:', chatMessage)
-    setIsSubmitting(true)
-    
-    // Simulate processing for 5 seconds
-    setTimeout(() => {
-      setIsSubmitting(false)
-      setChatMessage('')
-      console.log('Chat submission completed')
-    }, 5000)
+    console.log('Action clicked:', actionText)
   }
 
   const saveToFundraiseProject = async (file: File, fileUrl: string, bucketName: string) => {
@@ -435,7 +427,8 @@ export function FundraisingDashboard() {
   }
 
   const handleCrmDatabaseClick = () => {
-    window.open('https://docs.google.com/spreadsheets/d/1s1wiWbeTLt06rwWvSWjcUHxQLa5VoW61i81T3YDN19A/edit?gid=1390972581#gid=1390972581', '_blank')
+    const url = crmSpreadsheetUrl || 'https://docs.google.com/spreadsheets/d/1s1wiWbeTLt06rwWvSWjcUHxQLa5VoW61i81T3YDN19A/edit?gid=1390972581#gid=1390972581'
+    window.open(url, '_blank')
   }
 
   const meetings = [
@@ -628,10 +621,19 @@ export function FundraisingDashboard() {
                           handleStartFundraise('dashboard-fundraise')
                         }
                       }}
-                      disabled={!isSubscribed || !fundraiseProjectData?.pitch_deck_link || !fundraiseProjectData?.funds_list_link}
+                      disabled={!isSubscribed || !fundraiseProjectData?.pitch_deck_link || !fundraiseProjectData?.funds_list_link || processingFiles.has('dashboard-fundraise')}
                     >
-                      <Bot className="w-4 h-4 mr-1" />
-                      Start Fundraise
+                      {processingFiles.has('dashboard-fundraise') ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Bot className="w-4 h-4 mr-1" />
+                          Start Fundraise
+                        </>
+                      )}
                     </Button>
                   </div>
                 </CardHeader>
@@ -721,6 +723,8 @@ export function FundraisingDashboard() {
                   </div>
                 </CardContent>
               </Card>
+
+
 
               {/* Upcoming Meetings */}
               <Card className="bg-white/10 backdrop-blur-sm border-white/20 shadow-lg">
@@ -845,38 +849,7 @@ export function FundraisingDashboard() {
           </div>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-black/20 backdrop-blur-sm border-t border-white/10 p-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-center gap-3">
-              <div className="flex-1 relative">
-                <Input
-                  placeholder={isSubscribed ? "Ask anything..." : "Subscribe to start using FundraiseAgent..."}
-                  value={chatMessage}
-                  onChange={(e) => setChatMessage(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !isSubmitting && isSubscribed) {
-                      handleChatSubmit()
-                    }
-                  }}
-                  className="pr-12 bg-white/10 border-white/20 focus:border-blue-400 text-white placeholder:text-gray-400 h-12 text-base"
-                  disabled={!isSubscribed}
-                />
-                <Button
-                  size="icon"
-                  disabled={isSubmitting || !chatMessage.trim() || !isSubscribed}
-                  onClick={handleChatSubmit}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <ArrowUp className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+
       </div>
     </div>
   )

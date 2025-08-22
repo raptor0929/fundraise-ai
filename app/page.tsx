@@ -1,5 +1,11 @@
 import { FundraisingDashboard } from "@/components/fundraising-dashboard"
+import { RelevanceChat } from "@/components/relevance-chat"
 
 export default function Home() {
-  return <FundraisingDashboard />
+  return (
+    <>
+      <FundraisingDashboard />
+      <RelevanceChat />
+    </>
+  )
 }
