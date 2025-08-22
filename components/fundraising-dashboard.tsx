@@ -7,9 +7,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import Link from "next/link"
-import { FileText, Calendar, MessageSquare, Mail, ChevronRight, ArrowUp, Clock, Users, Moon, Upload, X, Bot, Loader2, CheckCircle } from "lucide-react"
+import { FileText, Calendar, MessageSquare, Mail, ChevronRight, ArrowUp, Clock, Users, Moon, Upload, X, Bot, Loader2, CheckCircle, ExternalLink } from "lucide-react"
 import { ConnectWallet } from "@/components/connect-wallet"
 import { useContract } from "@/hooks/use-contract"
+import { createClient } from '@supabase/supabase-js'
+import { useAccount } from 'wagmi'
+
+// Initialize Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 export function FundraisingDashboard() {
   const [chatMessage, setChatMessage] = useState("")
@@ -17,6 +24,7 @@ export function FundraisingDashboard() {
   const [showCrmDatabase, setShowCrmDatabase] = useState(false)
 
   const [uploadedFiles, setUploadedFiles] = useState<any[]>([])
+  const [fundraiseProjectData, setFundraiseProjectData] = useState<any>(null)
 
   const [aiGeneratedFiles] = useState([
     { id: "3", name: "CRM Database", type: "sheet", icon: FileText, color: "bg-indigo-600", size: 0 },
@@ -43,6 +51,9 @@ export function FundraisingDashboard() {
     currentSubscriptionCost,
   } = useContract()
 
+  // Get wallet address
+  const { address: walletAddress } = useAccount()
+
   // Format subscription cost for display
   const formatSubscriptionCost = (cost: bigint | undefined) => {
     if (!cost) return "10 MNT"
@@ -56,6 +67,110 @@ export function FundraisingDashboard() {
       setIsSubscribed(true)
     }
   }, [isMintSuccess, isActive])
+
+  // Fetch fundraise project data when wallet connects
+  useEffect(() => {
+    if (walletAddress) {
+      fetchFundraiseProjectData()
+    }
+  }, [walletAddress])
+
+  const fetchFundraiseProjectData = async () => {
+    if (!walletAddress) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('fundraise_project')
+        .select('*')
+        .eq('user_wallet', walletAddress)
+        .single()
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching fundraise project data:', error)
+        return
+      }
+      
+      if (data) {
+        setFundraiseProjectData(data)
+        // Load existing files into the uploadedFiles state
+        loadExistingFiles(data)
+      }
+    } catch (error) {
+      console.error('Error fetching fundraise project data:', error)
+    }
+  }
+
+  const loadExistingFiles = (projectData: any) => {
+    const existingFiles: any[] = []
+    
+    if (projectData.pitch_deck_link) {
+      existingFiles.push({
+        id: `pitch-deck-${Date.now()}`,
+        name: 'Pitch Deck',
+        type: 'pdf',
+        icon: FileText,
+        color: "bg-red-600",
+        size: 0,
+        url: projectData.pitch_deck_link,
+        bucketName: 'pitch-decks',
+        fileName: 'pitch-deck'
+      })
+    }
+    
+    if (projectData.funds_list_link) {
+      existingFiles.push({
+        id: `funds-list-${Date.now()}`,
+        name: 'Funds List',
+        type: 'csv',
+        icon: FileText,
+        color: "bg-green-600",
+        size: 0,
+        url: projectData.funds_list_link,
+        bucketName: 'funds-lists',
+        fileName: 'funds-list'
+      })
+    }
+    
+    setUploadedFiles(existingFiles)
+  }
+
+  const updateUploadedFilesList = (projectData: any) => {
+    const currentFiles = [...uploadedFiles]
+    
+    // Check if pitch deck file already exists
+    const hasPitchDeck = currentFiles.some(file => file.bucketName === 'pitch-decks')
+    if (projectData.pitch_deck_link && !hasPitchDeck) {
+      currentFiles.push({
+        id: `pitch-deck-${Date.now()}`,
+        name: 'Pitch Deck',
+        type: 'pdf',
+        icon: FileText,
+        color: "bg-red-600",
+        size: 0,
+        url: projectData.pitch_deck_link,
+        bucketName: 'pitch-decks',
+        fileName: 'pitch-deck'
+      })
+    }
+    
+    // Check if funds list file already exists
+    const hasFundsList = currentFiles.some(file => file.bucketName === 'funds-lists')
+    if (projectData.funds_list_link && !hasFundsList) {
+      currentFiles.push({
+        id: `funds-list-${Date.now()}`,
+        name: 'Funds List',
+        type: 'csv',
+        icon: FileText,
+        color: "bg-green-600",
+        size: 0,
+        url: projectData.funds_list_link,
+        bucketName: 'funds-lists',
+        fileName: 'funds-list'
+      })
+    }
+    
+    setUploadedFiles(currentFiles)
+  }
 
   // Monitor uploadedFiles state changes
   useEffect(() => {
@@ -108,8 +223,37 @@ export function FundraisingDashboard() {
     setUploadProgress(0)
     setShowUploadDialog(true)
 
-    // Simple upload simulation with setTimeout
-    setTimeout(() => {
+    try {
+      // Determine bucket based on file type
+      let bucketName = 'documents'
+      if (file.type === 'application/pdf') {
+        bucketName = 'pitch-decks'
+      } else if (file.type === 'text/csv' || file.type.includes('excel') || file.type.includes('spreadsheet')) {
+        bucketName = 'funds-lists'
+      }
+
+      // Create unique filename with timestamp and wallet address
+      const timestamp = new Date().getTime()
+      const walletAddress = isConnected ? 'connected-wallet' : 'anonymous'
+      const fileName = `${walletAddress}/${timestamp}-${file.name}`
+
+      // Upload file to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        })
+
+      if (error) {
+        throw error
+      }
+
+      // Get public URL for the uploaded file
+      const { data: urlData } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(fileName)
+
       // Add the new file to the uploaded files list
       const newFile = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -117,8 +261,12 @@ export function FundraisingDashboard() {
         type: file.name.split('.').pop()?.toLowerCase() || 'file',
         icon: FileText,
         color: "bg-green-600",
-        size: file.size
+        size: file.size,
+        url: urlData.publicUrl,
+        bucketName: bucketName,
+        fileName: fileName
       }
+      
       console.log('Adding new file to state:', newFile)
       setUploadedFiles(prev => {
         console.log('Current files count:', prev.length)
@@ -127,32 +275,73 @@ export function FundraisingDashboard() {
         return newFiles
       })
       
+      // Save or update fundraise_project record
+      await saveToFundraiseProject(file, urlData.publicUrl, bucketName)
+      
+      setUploadProgress(100)
+      
+    } catch (error: any) {
+      console.error('Upload error:', error)
+      // You might want to show an error message to the user here
+    } finally {
       // Reset all states
-      setIsUploading(false)
-      setShowUploadDialog(false)
-      setUploadProgress(0)
-      setUploadingFileId(null)
-      isUploadingRef.current = false
-    }, 2000) // 2 second delay to simulate upload
+      setTimeout(() => {
+        setIsUploading(false)
+        setShowUploadDialog(false)
+        setUploadProgress(0)
+        setUploadingFileId(null)
+        isUploadingRef.current = false
+      }, 1000) // 1 second delay to show completion
+    }
   }
 
-  const handleStartFundraise = (fileId: string) => {
+  const handleStartFundraise = async (fileId: string) => {
     if (!isSubscribed) return // Disable fundraise if not subscribed
     
     console.log('Starting fundraise for file:', fileId)
     setProcessingFiles(prev => new Set(prev).add(fileId))
     
-    // Simulate fundraise processing for 5 seconds
-    setTimeout(() => {
+    try {
+      // Check if we have both required files
+      if (!fundraiseProjectData?.pitch_deck_link || !fundraiseProjectData?.funds_list_link) {
+        console.error('Missing required files for fundraise')
+        return
+      }
+      
+      // Make webhook call to process files
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_HOST}/webhook-test/process-files`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pitchDeckLink: fundraiseProjectData.pitch_deck_link,
+          fundsListLink: fundraiseProjectData.funds_list_link
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      console.log('Fundraise processing result:', result)
+      
+      // Show CRM Database after successful fundraise processing
+      setShowCrmDatabase(true)
+      console.log('Fundraise completed successfully')
+      
+    } catch (error) {
+      console.error('Error during fundraise processing:', error)
+      // You might want to show an error message to the user here
+    } finally {
+      // Remove from processing state
       setProcessingFiles(prev => {
         const newSet = new Set(prev)
         newSet.delete(fileId)
         return newSet
       })
-      // Show CRM Database after fundraise processing is complete
-      setShowCrmDatabase(true)
-      console.log('Fundraise completed for file:', fileId)
-    }, 5000)
+    }
   }
 
   const handleActionButtonClick = (actionText: string) => {
@@ -172,6 +361,72 @@ export function FundraisingDashboard() {
       setChatMessage('')
       console.log('Chat submission completed')
     }, 5000)
+  }
+
+  const saveToFundraiseProject = async (file: File, fileUrl: string, bucketName: string) => {
+    try {
+      // Get actual wallet address
+      const currentWalletAddress = walletAddress || 'anonymous'
+      
+      // Determine which field to update based on file type
+      let updateData: any = {
+        user_wallet: currentWalletAddress,
+        status: 'created'
+      }
+      
+      if (bucketName === 'pitch-decks') {
+        updateData.pitch_deck_link = fileUrl
+      } else if (bucketName === 'funds-lists') {
+        updateData.funds_list_link = fileUrl
+      }
+      
+      // Check if a record already exists for this wallet
+      const { data: existingRecord, error: selectError } = await supabase
+        .from('fundraise_project')
+        .select('*')
+        .eq('user_wallet', currentWalletAddress)
+        .single()
+      
+      if (selectError && selectError.code !== 'PGRST116') {
+        // PGRST116 is "not found" error, which is expected if no record exists
+        console.error('Error checking existing record:', selectError)
+        return
+      }
+      
+      if (existingRecord) {
+        // Update existing record
+        const { error: updateError } = await supabase
+          .from('fundraise_project')
+          .update(updateData)
+          .eq('user_wallet', currentWalletAddress)
+        
+        if (updateError) {
+          console.error('Error updating fundraise_project:', updateError)
+        } else {
+          console.log('Updated fundraise_project record for wallet:', currentWalletAddress)
+          const updatedRecord = { ...existingRecord, ...updateData }
+          setFundraiseProjectData(updatedRecord)
+          // Update uploadedFiles state to reflect the new file
+          updateUploadedFilesList(updatedRecord)
+        }
+      } else {
+        // Create new record
+        const { error: insertError } = await supabase
+          .from('fundraise_project')
+          .insert([updateData])
+        
+        if (insertError) {
+          console.error('Error creating fundraise_project record:', insertError)
+        } else {
+          console.log('Created new fundraise_project record for wallet:', currentWalletAddress)
+          setFundraiseProjectData(updateData)
+          // Update uploadedFiles state to reflect the new file
+          updateUploadedFilesList(updateData)
+        }
+      }
+    } catch (error) {
+      console.error('Error saving to fundraise_project:', error)
+    }
   }
 
   const handleSubscribe = () => {
@@ -343,9 +598,13 @@ export function FundraisingDashboard() {
                       disabled={!isSubscribed}
                     />
                     <Button 
-                      variant="ghost" 
+                      variant={isSubscribed ? "default" : "ghost"}
                       size="sm" 
-                      className={`text-gray-300 hover:bg-white/10 cursor-pointer ${!isSubscribed ? 'cursor-not-allowed' : ''}`}
+                      className={`${
+                        isSubscribed 
+                          ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                          : 'text-gray-300 hover:bg-white/10 cursor-not-allowed'
+                      }`}
                       onClick={() => {
                         if (isSubscribed) {
                           document.getElementById('file-upload')?.click()
@@ -355,6 +614,24 @@ export function FundraisingDashboard() {
                     >
                       <Upload className="w-4 h-4 mr-1" />
                       Upload file
+                    </Button>
+                    <Button 
+                      variant={isSubscribed && fundraiseProjectData?.pitch_deck_link && fundraiseProjectData?.funds_list_link ? "default" : "ghost"}
+                      size="sm" 
+                      className={`${
+                        isSubscribed && fundraiseProjectData?.pitch_deck_link && fundraiseProjectData?.funds_list_link
+                          ? 'bg-green-600 hover:bg-green-700 text-white' 
+                          : 'text-gray-300 hover:bg-white/10 cursor-not-allowed opacity-50'
+                      }`}
+                      onClick={() => {
+                        if (isSubscribed && fundraiseProjectData?.pitch_deck_link && fundraiseProjectData?.funds_list_link) {
+                          handleStartFundraise('dashboard-fundraise')
+                        }
+                      }}
+                      disabled={!isSubscribed || !fundraiseProjectData?.pitch_deck_link || !fundraiseProjectData?.funds_list_link}
+                    >
+                      <Bot className="w-4 h-4 mr-1" />
+                      Start Fundraise
                     </Button>
                   </div>
                 </CardHeader>
@@ -405,30 +682,9 @@ export function FundraisingDashboard() {
                               <p className="font-medium text-white">{file.name}</p>
                               <p className="text-sm text-gray-400">{file.type.toUpperCase()}</p>
                             </div>
-                            {isPdf && (
-                              <Button
-                                size="sm"
-                                disabled={isProcessing || !isSubscribed}
-                                onClick={() => handleStartFundraise(file.id)}
-                                className={`${
-                                  isProcessing 
-                                    ? 'bg-blue-600 text-white' 
-                                    : 'bg-green-600 hover:bg-green-700 text-white'
-                                } ${!isSubscribed ? 'opacity-50 cursor-not-allowed' : ''}`}
-                              >
-                                {isProcessing ? (
-                                  <>
-                                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                                    Processing...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Bot className="w-4 h-4 mr-1" />
-                                    Start Fundraise
-                                  </>
-                                )}
-                              </Button>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {/* View button removed */}
+                            </div>
                           </div>
                         )
                       })}
